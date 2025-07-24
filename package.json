@@ -1,0 +1,79 @@
+{
+  "name": "rad-debugger-communication",
+  "displayName": "Rad Debugger Communication",
+  "description": "run and communicate with rad debugger when using vscode",
+  "version": "1.0.1",
+  "publisher": "TraceMyers",
+  "engines": {
+    "vscode": "^1.102.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "rad-debugger-communication.launch",
+        "title": "Launch Rad Debugging"
+      }
+    ],
+    "configuration": {
+      "title": "rad debugger communication config",
+      "properties": {
+        "rad-debugger-communication.targetPath": {
+          "type": "string",
+          "default": "main.exe",
+          "description": "the executable that raddebugger is meant to debug. note that there can be no instance of rad debugger open when the target is initially set. once it is set, it should stay set until you edit the target list in raddbg manually. see 'rad-debugger-communication.targetPathIsProjectRelative' for more information."
+        },
+        "rad-debugger-communication.targetPathIsWorkspaceRelative": {
+          "type": "boolean",
+          "default": true,
+          "description": "if true, the target path is appended to the workspace path. else, full path is assumed."
+        },
+        "rad-debugger-communication.closeRaddbgOnProgramExit": {
+          "type": "boolean",
+          "default": true,
+          "description": "when the debug target exe finishes execution, close rad debugger"
+        },
+        "rad-debugger-communication.waitForRaddbgTimeout": {
+          "type": "integer",
+          "default": 1000,
+          "description": "how many milliseconds to wait after launching raddbg before giving up on trying to communicate with it. note that the waiting in this extension is pretty inaccurate, I think because sleeping in node/js/ts envs is just inaccurate."
+        },
+        "rad-debugger-communication.autoRun": {
+          "type": "boolean",
+          "default": true,
+          "description": "If set to true, rad debugger will attach and run the target when the command to launch debugging is issued."
+        },
+        "rad-debugger-communication.radDebuggerPath": {
+          "type": "string",
+          "default": "raddbg",
+          "description": "path to raddebugger. if raddbg.exe is in your path, leave this default."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile && npm run lint",
+    "lint": "eslint src",
+    "test": "vscode-test"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.102.0",
+    "@types/mocha": "^10.0.10",
+    "@types/node": "20.x",
+    "@typescript-eslint/eslint-plugin": "^8.31.1",
+    "@typescript-eslint/parser": "^8.31.1",
+    "eslint": "^9.25.1",
+    "typescript": "^5.8.3",
+    "@vscode/test-cli": "^0.0.11",
+    "@vscode/test-electron": "^2.5.2"
+  }
+}
