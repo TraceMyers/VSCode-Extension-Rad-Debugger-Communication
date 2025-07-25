@@ -13,7 +13,6 @@ As a vscode user, all you have to do is make sure the config is set correctly (`
 
 ### How To Make a Launch Configuration
 
-The implementation is a little hacky. You cannot currently specify the target via the launch.json, but you can make a launch config with a preLaunchTask. Here's how to do that:
 1. Make sure your rad-debugger-communication settings are set correctly
 2. Make a .vscode/launch.json like this (given 'build the executable' is a task in your .vscode/tasks.json):
 
