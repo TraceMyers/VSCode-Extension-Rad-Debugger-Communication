@@ -1,20 +1,40 @@
-# rad-debugger-communication README
+# rad-debugger-communication
+---
 
 Taking advantage of rad debugger's inter-process communication feature, leverage a headless instance of rad debugger to drive another instance. In other words, we can set/unset/disable/enable breakpoints, set the target, auto-run and many more things, all with one button press from vscode. 
 
 As a vscode user, all you have to do is make sure the config is set correctly (`rad-debugger-communication` in your settings), set/unset/enable/disable source breakpoints within vscode, and select "Launch Rad Debugging" from the vscode command palette.
 
 ## Features
-
+---
 * set source breakpoints in vscode and have them replicated to rad debugger.
 * have the target auto-run from rad debugger.
 * leave rad debugger open or have it automatically close when the target ends successfully (returns 0). 
 
-## Requirements
+### How To Make a Launch Configuration
 
+The implementation is a little hacky. You cannot currently specify the target via the launch.json, but you can make a launch config with a preLaunchTask. Here's how to do that:
+1. Make sure your rad-debugger-communication settings are set correctly
+2. Make a .vscode/launch.json like this (given 'build the executable' is a task in your .vscode/tasks.json):
+
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "build and debug",
+      "type": "raddebugger",
+      "request": "launch",
+      "program": "",
+      "preLaunchTask": "build the executable"
+    }
+  ]
+}
+
+## Requirements
 ---
 
 ## Extension Settings
+---
 
 * `rad-debugger-communication.targetPath`
 * `rad-debugger-communication.targetPathIsWorkspaceRelative`
@@ -24,10 +44,10 @@ As a vscode user, all you have to do is make sure the config is set correctly (`
 * `rad-debugger-communication.radDebuggerPath`
 
 ## Known Issues
-
 ---
 
 ## Release Notes
+---
 
 ### 1.0.0
 
@@ -36,3 +56,11 @@ Initial release of the extension
 ### 1.0.1
 
 Made it so raddbg.exe doesn't have to be in your PATH
+
+### 1.1.0
+
+Made it so you can create a launch configuration
+
+## 1.1.1
+
+using launch config is faster by making sure raddbg is a detached process

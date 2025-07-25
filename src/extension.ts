@@ -1,6 +1,8 @@
 import * as vscode from 'vscode';
-import { exec } from "child_process";
+import { exec, spawn } from "child_process";
 import { promisify } from "util";
+import { DebugSession, InitializedEvent, TerminatedEvent } from '@vscode/debugadapter';
+import { DebugProtocol } from '@vscode/debugprotocol';
 
 interface BreakpointIR {
 	path: string;
@@ -17,6 +19,8 @@ export let target_path_is_workspace_relative: boolean;
 export let wait_for_process_timeout: number;
 export let auto_run_target: boolean;
 export let rad_debugger_path: string | undefined;
+
+export function deactivate() {}
 
 export function activate(context: vscode.ExtensionContext) {
 	refreshConfig();
@@ -59,79 +63,41 @@ export function activate(context: vscode.ExtensionContext) {
 	context.subscriptions.push(breakpointsChangeListener);
 
 	// create a command to launch rad debugging
-	const launchCommand = vscode.commands.registerCommand("rad-debugger-communication.launch", async () => {
-		// settings may have changed...
-		refreshConfig();
-
-		let targetIdentifier = "";
-		if (target_path !== undefined) {
-			targetIdentifier += " " + target_path;
-		}
-		if (quit_on_program_exit) {
-			targetIdentifier += " -q";
-		}
-		
-		let isRunning = await raddbgIsRunning();
-		if (!isRunning) {
-			// launch rad debugger 
-			let runCommand = rad_debugger_path + targetIdentifier;
-			console.log("running command", runCommand);
-			exec(runCommand, (error, stdout, stderr) => {
-				if (error) {
-					console.error("failed launching...?");
-				}
-			});
-
-			let i = 0;
-			const waitTimeMs = 100;
-			let sanityIterMax = Math.max((wait_for_process_timeout / waitTimeMs) * 2, 1);
-			let timeoutTimer = wait_for_process_timeout;
-			let prevDate = new Date();
-
-			// tested, this is super innacurate waiting but it works alright. it seems generous.
-			while (true) {
-				if (timeoutTimer <= 0 || i >= sanityIterMax) {
-					break;
-				}
-				isRunning = await raddbgIsRunning();
-				if (isRunning) {
-					break;
-				}
-				const newDate = new Date();
-				const timeDiff = Math.max(newDate.getMilliseconds() - prevDate.getMilliseconds(), 0);
-				prevDate = newDate;
-				timeoutTimer -= timeDiff;
-				await sleep(waitTimeMs);
-				i += 1;
-			}
-		}
-
-		if (!isRunning) {
-			console.log("failed to spawn raddbg instance, or failed to detect the instance is running.");
-			return;
-		}
-
-		// clear all breakpoints in raddbg
-		await run(rad_debugger_path + " --ipc clear_breakpoints");
-
-		// add all breakpoints from vscode
-		for (const bp of breakpoints) {
-			if (bp.enabled) {
-				const command = rad_debugger_path + " --ipc add_breakpoint " + bp.path; 
-				await run(command);
-			}
-		}
-
-		if (auto_run_target) {
-			// make sure the target we're running is enabled
-			const enableTargetCommand = rad_debugger_path + " --ipc enable_target" + targetIdentifier;
-			await run(enableTargetCommand);
-			// run exe and debug (actually runs all targets ewwwwww)
-			const launchAndRunExeCommand = rad_debugger_path + " --ipc run";
-			await run(launchAndRunExeCommand);
-		}
-	});
+	const launchCommand = vscode.commands.registerCommand("rad-debugger-communication.launch", async () => { runRadSession(); });
 	context.subscriptions.push(launchCommand);
+
+	// gemini
+	const debugConfigProvider: vscode.DebugConfigurationProvider = {
+		resolveDebugConfiguration(folder, config, token) {
+			 // If this is a new, empty configuration, provide some defaults.
+            // This is crucial when the user hasn't set up a launch.json yet.
+            if (!config.type && !config.request && !config.name) {
+                config.type = "raddebugger";
+                config.name = "Launch Rad Debugger";
+                config.request = "launch";
+                // Provide a sensible default for 'program' if it's not already set
+                // You might want to make this configurable via extension settings
+                if (!config.program) {
+                    config.program = "${workspaceFolder}/main.exe"; // Or whatever your default target is
+                }
+            }
+
+            // Ensure the type is correct for your debugger
+            if (config.type !== "raddebugger") {
+                // If it's not for your debugger type, let other providers handle it.
+                // Or if it's an error, you can return undefined or throw.
+                return undefined;
+            }
+
+            // Return the resolved configuration.
+            return config;
+		}
+	};
+	context.subscriptions.push(vscode.debug.registerDebugConfigurationProvider("raddebugger", debugConfigProvider));
+
+	// Register the Debug Adapter Descriptor Factory
+    // This tells VS Code to use your RadDebuggerSpoofSession class as the debug adapter
+    context.subscriptions.push(vscode.debug.registerDebugAdapterDescriptorFactory("raddebugger", new InlineDebugAdapterFactory()));
 }
 
 function getBreakpointPath(breakpoint: vscode.SourceBreakpoint): string {
@@ -247,6 +213,86 @@ function refreshConfig() {
 	}
 }
 
+async function runRadSession() {
+	// settings may have changed...
+	refreshConfig();
+
+	let targetIdentifier = "";
+	let args: string[] = [];
+	if (target_path !== undefined) {
+		targetIdentifier += " " + target_path;
+		args.push(target_path);
+	}
+	if (quit_on_program_exit) {
+		targetIdentifier += " -q";
+		args.push("-q");
+	}
+	
+	let isRunning = await raddbgIsRunning();
+	if (!isRunning) {
+		// launch rad debugger 
+
+		let runCommand = rad_debugger_path + targetIdentifier;
+		console.log("running command", runCommand);
+		const radPath: string = rad_debugger_path ?? "raddbg";
+
+		// chatgpt helps for speed
+		const subprocess = spawn(radPath, args, {
+			detached: true,
+			stdio: 'ignore', // <- this is crucial to fully detach
+		});
+		subprocess.unref(); // allow parent to exit independently
+
+		let i = 0;
+		const waitTimeMs = 100;
+		let sanityIterMax = Math.max((wait_for_process_timeout / waitTimeMs) * 2, 1);
+		let timeoutTimer = wait_for_process_timeout;
+		let prevDate = new Date();
+
+		// tested, this is super innacurate waiting but it works alright. it seems generous.
+		while (true) {
+			if (timeoutTimer <= 0 || i >= sanityIterMax) {
+				break;
+			}
+			isRunning = await raddbgIsRunning();
+			if (isRunning) {
+				break;
+			}
+			const newDate = new Date();
+			const timeDiff = Math.max(newDate.getMilliseconds() - prevDate.getMilliseconds(), 0);
+			prevDate = newDate;
+			timeoutTimer -= timeDiff;
+			await sleep(waitTimeMs);
+			i += 1;
+		}
+	}
+
+	if (!isRunning) {
+		console.log("failed to spawn raddbg instance, or failed to detect the instance is running.");
+		return;
+	}
+
+	// clear all breakpoints in raddbg
+	await run(rad_debugger_path + " --ipc clear_breakpoints");
+
+	// add all breakpoints from vscode
+	for (const bp of breakpoints) {
+		if (bp.enabled) {
+			const command = rad_debugger_path + " --ipc add_breakpoint " + bp.path; 
+			await run(command);
+		}
+	}
+
+	if (auto_run_target) {
+		// make sure the target we're running is enabled
+		const enableTargetCommand = rad_debugger_path + " --ipc enable_target" + targetIdentifier;
+		await run(enableTargetCommand);
+		// run exe and debug (actually runs all targets ewwwwww)
+		const launchAndRunExeCommand = rad_debugger_path + " --ipc run";
+		await run(launchAndRunExeCommand);
+	}
+}
+
 // thanks chatgpt
 const execAsync = promisify(exec);
 
@@ -264,5 +310,66 @@ function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-// This method is called when your extension is deactivated
-export function deactivate() {}
+class InlineDebugAdapterFactory implements vscode.DebugAdapterDescriptorFactory {
+    createDebugAdapterDescriptor(session: vscode.DebugSession, executable: vscode.DebugAdapterExecutable | undefined): vscode.ProviderResult<vscode.DebugAdapterDescriptor> {
+        // This will create an instance of our spoof debug adapter in the same process as the extension host
+        console.log("Creating inline spoof debug adapter for session:", session.name);
+        return new vscode.DebugAdapterInlineImplementation(new RadDebuggerSpoofSession());
+    }
+}
+
+// gemini just spit out a bunch of code here that essentially tells vscode to do fuck all when starting a rad debugging session. 
+// basically just deleted like half of it and made sure it called runRadSession()
+class RadDebuggerSpoofSession extends DebugSession {
+
+    public constructor() {
+        super();
+    }
+
+    protected initializeRequest(response: DebugProtocol.InitializeResponse, args: DebugProtocol.InitializeRequestArguments): void {
+        console.log("Spoof Debug Adapter: initializeRequest received");
+
+        // Tell VS Code what capabilities your adapter supports.
+        // For a spoof adapter, these can be minimal.
+        response.body = {
+            supportsConfigurationDoneRequest: true,
+            supportsEvaluateForHovers: false,
+            supportsStepBack: false,
+            supportsDataBreakpoints: false,
+            supportsFunctionBreakpoints: false,
+            supportsConditionalBreakpoints: false,
+            supportsLogPoints: false,
+            supportsHitConditionalBreakpoints: false,
+            supportsSetVariable: false,
+            supportsRestartRequest: false,
+            supportsGotoTargetsRequest: false,
+            supportsCompletionsRequest: false,
+            supportsModulesRequest: false,
+            supportsLoadedSourcesRequest: false,
+            supportsExceptionInfoRequest: false,
+            supportsExceptionOptions: false,
+            supportsValueFormattingOptions: false,
+            supportsTerminateRequest: false,
+            supportsRestartFrame: false,
+            supportsSetExpression: false,
+            supportsReadMemoryRequest: false,
+            supportsDisassembleRequest: false,
+            supportsTerminateThreadsRequest: false,
+            supportsCancelRequest: false,
+            // ... all other capabilities set to false or omitted
+        };
+        this.sendResponse(response);
+        // Important: Tell VS Code that the adapter is initialized and ready for commands.
+        this.sendEvent(new InitializedEvent());
+    }
+
+    protected launchRequest(response: DebugProtocol.LaunchResponse, args: DebugProtocol.LaunchRequestArguments, request?: DebugProtocol.Request): void {
+		runRadSession();
+        this.sendResponse(response); // Send response immediately
+        this.sendEvent(new TerminatedEvent()); // End the debug session
+    }
+
+    protected disconnectRequest(response: DebugProtocol.DisconnectResponse, args: DebugProtocol.DisconnectArguments, request?: DebugProtocol.Request): void {
+        this.sendResponse(response);
+    }
+}

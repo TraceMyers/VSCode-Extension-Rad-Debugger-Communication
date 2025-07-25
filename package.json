@@ -2,8 +2,9 @@
   "name": "rad-debugger-communication",
   "displayName": "Rad Debugger Communication",
   "description": "run and communicate with rad debugger when using vscode",
-  "version": "1.0.1",
+  "version": "1.1.1",
   "publisher": "TraceMyers",
+  "repository": "https://github.com/TraceMyers/VSCode-Extension-Rad-Debugger-Communication",
   "engines": {
     "vscode": "^1.102.0"
   },
@@ -11,7 +12,8 @@
     "Other"
   ],
   "activationEvents": [
-    "onStartupFinished"
+    "onStartupFinished",
+    "onDebugResolve:raddebugger"
   ],
   "main": "./out/extension.js",
   "contributes": {
@@ -55,7 +57,35 @@
           "description": "path to raddebugger. if raddbg.exe is in your path, leave this default."
         }
       }
-    }
+    },
+    "debuggers": [
+      {
+        "type": "raddebugger",
+        "label": "rad debugger",
+        "configurationAttributes": {
+          "launch": {
+            "required": [
+              "program"
+            ],
+            "properties": {
+              "program": {
+                "type": "string",
+                "description": "path to the target exe",
+                "default": "${file}"
+              }
+            }
+          }
+        },
+        "initialConfigurations": [
+          {
+            "type": "raddebugger",
+            "request": "launch",
+            "name": "launch rad debugger",
+            "program": "${file}"
+          }
+        ]
+      }
+    ]
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",
@@ -66,14 +96,17 @@
     "test": "vscode-test"
   },
   "devDependencies": {
-    "@types/vscode": "^1.102.0",
     "@types/mocha": "^10.0.10",
     "@types/node": "20.x",
+    "@types/vscode": "^1.102.0",
     "@typescript-eslint/eslint-plugin": "^8.31.1",
     "@typescript-eslint/parser": "^8.31.1",
-    "eslint": "^9.25.1",
-    "typescript": "^5.8.3",
     "@vscode/test-cli": "^0.0.11",
-    "@vscode/test-electron": "^2.5.2"
+    "@vscode/test-electron": "^2.5.2",
+    "eslint": "^9.25.1",
+    "typescript": "^5.8.3"
+  },
+  "dependencies": {
+    "@vscode/debugadapter": "^1.68.0"
   }
 }
