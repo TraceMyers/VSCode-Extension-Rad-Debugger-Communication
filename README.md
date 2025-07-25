@@ -17,6 +17,7 @@ The implementation is a little hacky. You cannot currently specify the target vi
 1. Make sure your rad-debugger-communication settings are set correctly
 2. Make a .vscode/launch.json like this (given 'build the executable' is a task in your .vscode/tasks.json):
 
+```json
 {
   "version": "0.2.0",
   "configurations": [
@@ -29,6 +30,13 @@ The implementation is a little hacky. You cannot currently specify the target vi
     }
   ]
 }
+```
+
+If you leave the 'program' field blank, the launch config will use the target path from your settings at `rad-debugger-communication.targetPath` + `rad-debugger-communication.targetPathIsWorkspaceRelative`, exactly as if you had run the command frome the command palette. If you want to have multiple target exes, you can optionally fill in the 'program' fields. Unlike in the settings, however, you should use standard launch.json / vscodey syntax for relative pathing. For example, `${workspaceFolder}/bin/game.exe`, which auto-resolves to a fully-qualified path on the backend.
+
+Note that Rad Debugger will search the target's directory for .pdb files to gather debug information from. If you have custom pdb locations, you will have to give that information to Rad Debugger. 
+
+If you want to request a feature, add issues at `https://github.com/TraceMyers/VSCode-Extension-Rad-Debugger-Communication` or email me at main@tracemyers.com.
 
 ## Requirements
 ---
@@ -61,6 +69,10 @@ Made it so raddbg.exe doesn't have to be in your PATH
 
 Made it so you can create a launch configuration
 
-## 1.1.1
+### 1.1.1
 
-using launch config is faster by making sure raddbg is a detached process
+Using launch config is faster by making sure raddbg is a detached process
+
+## 1.1.2
+
+Made it so you can customize the targets per launch config

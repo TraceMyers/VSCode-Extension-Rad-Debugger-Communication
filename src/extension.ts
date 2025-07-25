@@ -63,7 +63,10 @@ export function activate(context: vscode.ExtensionContext) {
 	context.subscriptions.push(breakpointsChangeListener);
 
 	// create a command to launch rad debugging
-	const launchCommand = vscode.commands.registerCommand("rad-debugger-communication.launch", async () => { runRadSession(); });
+	const launchCommand = vscode.commands.registerCommand("rad-debugger-communication.launch", async () => { 
+		const targetPath: string = target_path ?? "";
+		runRadSession(targetPath); 
+	});
 	context.subscriptions.push(launchCommand);
 
 	// gemini
@@ -213,15 +216,15 @@ function refreshConfig() {
 	}
 }
 
-async function runRadSession() {
+async function runRadSession(targetPath: string) {
 	// settings may have changed...
 	refreshConfig();
 
 	let targetIdentifier = "";
 	let args: string[] = [];
 	if (target_path !== undefined) {
-		targetIdentifier += " " + target_path;
-		args.push(target_path);
+		targetIdentifier += " " + targetPath;
+		args.push(targetPath);
 	}
 	if (quit_on_program_exit) {
 		targetIdentifier += " -q";
@@ -364,7 +367,11 @@ class RadDebuggerSpoofSession extends DebugSession {
     }
 
     protected launchRequest(response: DebugProtocol.LaunchResponse, args: DebugProtocol.LaunchRequestArguments, request?: DebugProtocol.Request): void {
-		runRadSession();
+		let programPath = (args as any).program;
+		if (!programPath || programPath === "") {
+			programPath = target_path;
+		}
+		runRadSession(programPath);
         this.sendResponse(response); // Send response immediately
         this.sendEvent(new TerminatedEvent()); // End the debug session
     }

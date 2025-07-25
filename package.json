@@ -2,7 +2,7 @@
   "name": "rad-debugger-communication",
   "displayName": "Rad Debugger Communication",
   "description": "run and communicate with rad debugger when using vscode",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "publisher": "TraceMyers",
   "repository": "https://github.com/TraceMyers/VSCode-Extension-Rad-Debugger-Communication",
   "engines": {
@@ -71,7 +71,7 @@
               "program": {
                 "type": "string",
                 "description": "path to the target exe",
-                "default": "${file}"
+                "default": ""
               }
             }
           }
@@ -81,7 +81,7 @@
             "type": "raddebugger",
             "request": "launch",
             "name": "launch rad debugger",
-            "program": "${file}"
+            "program": ""
           }
         ]
       }
