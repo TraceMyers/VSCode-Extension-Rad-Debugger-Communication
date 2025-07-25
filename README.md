@@ -31,7 +31,7 @@ As a vscode user, all you have to do is make sure the config is set correctly (`
 }
 ```
 
-If you leave the 'program' field blank, the launch config will use the target path from your settings at `rad-debugger-communication.targetPath` + `rad-debugger-communication.targetPathIsWorkspaceRelative`, exactly as if you had run the command frome the command palette. If you want to have multiple target exes, you can optionally fill in the 'program' fields. Unlike in the settings, however, you should use standard launch.json / vscodey syntax for relative pathing. For example, `${workspaceFolder}/bin/game.exe`, which auto-resolves to a fully-qualified path on the backend.
+If you leave the 'program' field blank, the launch config will use the target path from your settings at `rad-debugger-communication.targetPath` + `rad-debugger-communication.targetPathIsWorkspaceRelative`, exactly as if you had run the command from the command palette. If you want to have multiple target exes, you can optionally fill in the 'program' fields. Unlike in the settings, however, you should use standard launch.json / vscodey syntax for relative pathing. For example, `${workspaceFolder}/bin/game.exe`, which auto-resolves to a fully-qualified path on the backend.
 
 Note that Rad Debugger will search the target's directory for .pdb files to gather debug information from. If you have custom pdb locations, you will have to give that information to Rad Debugger. 
 
