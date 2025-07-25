@@ -72,6 +72,6 @@ Made it so you can create a launch configuration
 
 Using launch config is faster by making sure raddbg is a detached process
 
-## 1.1.2
+## 1.1.2 - 1.1.3
 
 Made it so you can customize the targets per launch config
