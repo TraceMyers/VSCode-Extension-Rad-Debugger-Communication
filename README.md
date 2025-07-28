@@ -40,6 +40,8 @@ If you want to request a feature, add issues at `https://github.com/TraceMyers/V
 ## Requirements
 ---
 
+Tested working on Rad Debugger 0.9.20 ALPHA 
+
 ## Extension Settings
 ---
 
@@ -80,6 +82,6 @@ Made it so you can customize the targets per launch config
 
 Fixed bug with breakpoint replication
 
-## 1.1.5
+## 1.1.5-1.1.6
 
 Added breakpoint disabling replication
