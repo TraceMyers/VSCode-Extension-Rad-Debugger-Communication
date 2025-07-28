@@ -11,7 +11,6 @@ interface BreakpointIR {
 
 export const DEBUG = false;
 
-export const breakpoints: BreakpointIR[] = [];
 export let project_path: string | undefined;
 export let target_path: string | undefined;
 export let quit_on_program_exit: boolean;
@@ -24,43 +23,6 @@ export function deactivate() {}
 
 export function activate(context: vscode.ExtensionContext) {
 	refreshConfig();
-
-	// collect breakpoints that were loaded from the sql database / vscode state
-	vscode.debug.breakpoints.forEach(breakpoint => {
-		if (breakpoint instanceof vscode.SourceBreakpoint) {
-			addUnique(breakpoints, getBreakpointIR(breakpoint));
-		}
-	});
-	logState();
-
-	// create a listener to maintain the list of breakpoints through edit events
-	const breakpointsChangeListener = vscode.debug.onDidChangeBreakpoints((event) => {
-		event.added.forEach(breakpoint => {
-			if (breakpoint instanceof vscode.SourceBreakpoint) {
-				addUnique(breakpoints, getBreakpointIR(breakpoint));
-				logState();
-			}
-		});
-		event.removed.forEach(breakpoint => {
-			if (breakpoint instanceof vscode.SourceBreakpoint) {
-				removeAll(breakpoints, getBreakpointIR(breakpoint));
-				logState();
-			}
-		});
-		event.changed.forEach(breakpoint => {
-			if (breakpoint instanceof vscode.SourceBreakpoint) {
-				const ir = getBreakpointIR(breakpoint);
-				const index = findBreakpointIRIndex(breakpoints, ir);
-				if (index !== -1) {
-					breakpoints[index].enabled = breakpoint.enabled;
-				} else { // error? assume we need to add...
-					breakpoints.push(ir);
-				}
-				logState();
-			}
-		});
-	});
-	context.subscriptions.push(breakpointsChangeListener);
 
 	// create a command to launch rad debugging
 	const launchCommand = vscode.commands.registerCommand("rad-debugger-communication.launch", async () => { 
@@ -184,9 +146,9 @@ function addUnique(arr: BreakpointIR[], value: BreakpointIR) {
 
 async function logState() {
 	console.log("new breakpoints state:");
-	breakpoints.forEach(bp => {
-		console.log("%s, %s", bp.path, String(bp.enabled));
-	});
+	// breakpoints.forEach(bp => {
+	// 	console.log("%s, %s", bp.path, String(bp.enabled));
+	// });
 	if (DEBUG) {
 		// reason for DEBUG: it's not ideal to be waiting on this every time
 		const isRunning: boolean = await raddbgIsRunning();
@@ -279,10 +241,38 @@ async function runRadSession(targetPath: string) {
 	await run(rad_debugger_path + " --ipc clear_breakpoints");
 
 	// add all breakpoints from vscode
-	for (const bp of breakpoints) {
-		if (bp.enabled) {
-			const command = rad_debugger_path + " --ipc add_breakpoint " + bp.path; 
-			await run(command);
+	let i = 0;
+	for (const bp of vscode.debug.breakpoints) {
+		if (bp instanceof vscode.SourceBreakpoint) {
+			const breakpoint = getBreakpointIR(bp);
+			const add_command = rad_debugger_path + " --ipc add_breakpoint " + breakpoint.path; 
+			await run(add_command);
+
+			// NOTE: this is fragile but I couldn't figure out how to use disable_breakpoint. should probably ask.
+			// getting raddbg cursor/focus in the right place for disabling any future breakpoints
+			if (i === 0) {
+				// bring the breakpoints window to the front
+				const focus_command = rad_debugger_path + " --ipc bring_to_front";
+				await run(focus_command);
+				// scroll up from bottom to the first breakpoitn
+				const scroll_command_1 = rad_debugger_path + " --ipc move_up";
+				await run(scroll_command_1);
+				// scroll right to hover the breakpoint toggle switch
+				const scroll_command_2 = rad_debugger_path + " --ipc move_right";
+				await run(scroll_command_2);
+			} else {
+				// scroll down to the new breakpoint toggler
+				const scroll_command = rad_debugger_path + " --ipc move_down";
+				await run(scroll_command);
+			}
+
+			if (!bp.enabled) {
+				// toggle the breakpoint off
+				const command2 = rad_debugger_path + " --ipc accept";
+				console.log("running " + command2);
+				await run(command2);
+			}
+			i += 1;
 		}
 	}
 
